@@ -15,6 +15,8 @@
         -- Volker Grabsch <vog@notjusthosting.com>
     Safety fixes
         -- Eugene Hopkinson <slowriot at voxelstorm dot com>
+    Raw input and output support
+        -- Jon Beltran de Heredia <jon at symnum dot com>
 */
 
 #include "sha1.hpp"
@@ -222,7 +224,6 @@ SHA1::SHA1()
     reset(digest, buffer, transforms);
 }
 
-
 void SHA1::update(const std::string &s)
 {
     std::istringstream is(s);
@@ -253,7 +254,7 @@ void SHA1::update(std::istream &is)
  * Add padding and return the message digest.
  */
 
-std::string SHA1::final()
+void SHA1::finalize()
 {
     /* Total number of hashed bits */
     uint64_t total_bits = (transforms*BLOCK_BYTES + buffer.size()) * 8;
@@ -279,9 +280,14 @@ std::string SHA1::final()
     }
 
     /* Append total_bits, split this uint64_t into two uint32_t */
-    block[BLOCK_INTS - 1] = total_bits;
-    block[BLOCK_INTS - 2] = (total_bits >> 32);
+    block[BLOCK_INTS - 1] = (uint32_t)( total_bits        & 0xFFFFFFFF);
+    block[BLOCK_INTS - 2] = (uint32_t)((total_bits >> 32) & 0xFFFFFFFF);
     transform(digest, block, transforms);
+}
+
+std::string SHA1::final()
+{
+    finalize();
 
     /* Hex std::string */
     std::ostringstream result;
@@ -304,4 +310,31 @@ std::string SHA1::from_file(const std::string &filename)
     SHA1 checksum;
     checksum.update(stream);
     return checksum.final();
+}
+
+
+void SHA1::update(const char *p, size_t size)
+{
+    std::string s(p, size);
+    update(s);
+}
+
+
+SHA1::raw_result_t SHA1::raw_final()
+{
+    raw_result_t result;
+    finalize();
+    for (size_t i = 0; i < 5; i++) {
+        result.bytes[i*4 + 0] = ((digest[i] >> 24) & 0xFF);
+        result.bytes[i*4 + 1] = ((digest[i] >> 16) & 0xFF);
+        result.bytes[i*4 + 2] = ((digest[i] >>  8) & 0xFF);
+        result.bytes[i*4 + 3] = ((digest[i]      ) & 0xFF);
+    }
+    /* Optimization that would work in a big endian architecture */
+    /* memcpy(result.bytes, digest, sizeof(digest)); */
+
+    /* Reset for next run */
+    reset(digest, buffer, transforms);
+
+    return result;
 }

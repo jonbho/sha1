@@ -15,6 +15,8 @@
         -- Volker Grabsch <vog@notjusthosting.com>
     Safety fixes
         -- Eugene Hopkinson <slowriot at voxelstorm dot com>
+    Raw input and output support
+        -- Jon Beltran de Heredia <jon at symnum dot com>
 */
 
 #ifndef SHA1_HPP
@@ -29,16 +31,23 @@
 class SHA1
 {
 public:
+    struct raw_result_t { uint8_t bytes[20]; };
+
     SHA1();
+    void update(const char *p, size_t size);
+    void update(const uint8_t *p, size_t size) { return update((const char *)p, size); }
     void update(const std::string &s);
     void update(std::istream &is);
     std::string final();
+    raw_result_t raw_final();
     static std::string from_file(const std::string &filename);
 
 private:
     uint32_t digest[5];
     std::string buffer;
     uint64_t transforms;
+
+    void finalize();
 };
 
 
